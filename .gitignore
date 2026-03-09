@@ -1,0 +1,35 @@
+# ── Environment & Secrets ──────────────────────────────────────────────────
+.env
+*.pem
+*.key
+
+# ── Python ─────────────────────────────────────────────────────────────────
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.ruff_cache/
+
+# ── dbt ────────────────────────────────────────────────────────────────────
+off_dbt/target/
+off_dbt/dbt_packages/
+off_dbt/logs/
+
+# ── Data files (never commit raw data) ────────────────────────────────────
+data/
+*.csv
+*.parquet
+*.json.gz
+
+# ── OS ─────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── VSCode ─────────────────────────────────────────────────────────────────
+.vscode/
+*.code-workspace
