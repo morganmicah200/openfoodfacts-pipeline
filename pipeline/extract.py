@@ -1,27 +1,15 @@
-"""
-pipeline/extract.py
-Fetches product data from the Open Food Facts API and writes raw JSON to S3.
-
-Responsibilities:
-- Paginate through each category in config.OFF_CATEGORIES
-- Respect rate limits with a small sleep between requests
-- Write one JSON file per category/page to S3 raw/products/YYYY-MM-DD/
-- Return a manifest of files written (for validate.py to consume)
-"""
-
+import gzip
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import requests
 import boto3
 from botocore.exceptions import ClientError
 
 from config import (
-    OFF_BASE_URL,
-    OFF_PAGE_SIZE,
-    OFF_CATEGORIES,
-    OFF_USER_AGENT,
+    TMDB_BASE_URL,
+    TMDB_API_KEY,
     AWS_ACCESS_KEY_ID,
     AWS_SECRET_ACCESS_KEY,
     AWS_DEFAULT_REGION,
@@ -32,117 +20,159 @@ from config import (
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-
-def fetch_products_by_category(category: str, page: int) -> dict:
-    """Fetch one page of products for a given category from the OFF API."""
-    url = f"{OFF_BASE_URL}/search"
-    params = {
-        "categories_tags": category,
-        "fields": (
-            "code,product_name,brands,categories,categories_tags,"
-            "countries,countries_tags,nutriscore_grade,ecoscore_grade,"
-            "energy-kcal_100g,fat_100g,saturated-fat_100g,carbohydrates_100g,"
-            "sugars_100g,proteins_100g,salt_100g,fiber_100g"
-        ),
-        "page_size": OFF_PAGE_SIZE,
-        "page": page,
-        "json": 1,
-    }
-    headers = {"User-Agent": OFF_USER_AGENT}
-
-    response = requests.get(url, params=params, headers=headers, timeout=60)
-    response.raise_for_status()
-    return response.json()
+EXPORT_BASE_URL = "https://files.tmdb.org/p/exports"
+CHECKPOINT_KEY = "checkpoints/movies_checkpoint.json"
+BATCH_SIZE = 10000
 
 
-def extract_all_products() -> list[dict]:
-    """Fetch all products across all configured categories."""
-    all_products = []
-    seen_ids = set()
-
-    for category in OFF_CATEGORIES:
-        logger.info(f"Extracting category: {category}")
-        page = 1
-
-        while True:
-            try:
-                data = fetch_products_by_category(category, page)
-                products = data.get("products", [])
-
-                if not products:
-                    logger.info(f"  {category}: no more products at page {page}")
-                    break
-
-                new_products = []
-                for p in products:
-                    product_id = p.get("code")
-                    if product_id and product_id not in seen_ids:
-                        seen_ids.add(product_id)
-                        new_products.append(p)
-
-                all_products.extend(new_products)
-                logger.info(
-                    f"  {category} page {page}: {len(new_products)} new products "
-                    f"(total: {len(all_products)})"
-                )
-
-                if len(products) < OFF_PAGE_SIZE:
-                    break
-
-                page += 1
-
-            except requests.RequestException as e:
-                logger.error(f"  {category} page {page} failed: {e}")
-                break
-
-    return all_products
-
-
-def upload_to_s3(products: list[dict], source_date: str) -> str:
-    """Upload extracted products as JSON to S3 raw layer."""
-    s3_client = boto3.client(
+def get_s3_client():
+    return boto3.client(
         "s3",
         aws_access_key_id=AWS_ACCESS_KEY_ID,
         aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
         region_name=AWS_DEFAULT_REGION,
     )
 
-    prefix = s3_raw_prefix(source_date)
-    key = f"{prefix}products.json"
 
-    payload = json.dumps(products, ensure_ascii=False)
-
+def load_checkpoint() -> dict:
+    """Load checkpoint from S3 if it exists."""
+    s3 = get_s3_client()
     try:
-        s3_client.put_object(
-            Bucket=S3_BUCKET,
-            Key=key,
-            Body=payload.encode("utf-8"),
-            ContentType="application/json",
-        )
-        s3_path = f"s3://{S3_BUCKET}/{key}"
-        logger.info(f"Uploaded {len(products)} products to {s3_path}")
-        return s3_path
-
-    except ClientError as e:
-        logger.error(f"S3 upload failed: {e}")
-        raise
+        response = s3.get_object(Bucket=S3_BUCKET, Key=CHECKPOINT_KEY)
+        checkpoint = json.loads(response["Body"].read().decode("utf-8"))
+        logger.info(f"Resuming from checkpoint: {checkpoint['movies_fetched']} movies already fetched")
+        return checkpoint
+    except s3.exceptions.NoSuchKey:
+        logger.info("No checkpoint found, starting fresh")
+        return {"movies_fetched": 0, "completed_batches": 0, "source_date": None}
+    except ClientError:
+        logger.info("No checkpoint found, starting fresh")
+        return {"movies_fetched": 0, "completed_batches": 0, "source_date": None}
 
 
-def run_extract(source_date: str = None) -> str:
-    """Main entry point for the extract step."""
+def save_checkpoint(movies_fetched: int, completed_batches: int, source_date: str):
+    """Save checkpoint to S3."""
+    s3 = get_s3_client()
+    checkpoint = {
+        "movies_fetched": movies_fetched,
+        "completed_batches": completed_batches,
+        "source_date": source_date,
+    }
+    s3.put_object(
+        Bucket=S3_BUCKET,
+        Key=CHECKPOINT_KEY,
+        Body=json.dumps(checkpoint).encode("utf-8"),
+        ContentType="application/json",
+    )
+
+
+def save_batch_to_s3(movies: list[dict], batch_num: int, source_date: str):
+    """Save a batch of movies to S3."""
+    s3 = get_s3_client()
+    prefix = s3_raw_prefix("movies", source_date)
+    key = f"{prefix}batch_{batch_num:04d}.json"
+    payload = json.dumps(movies, ensure_ascii=False)
+    s3.put_object(
+        Bucket=S3_BUCKET,
+        Key=key,
+        Body=payload.encode("utf-8"),
+        ContentType="application/json",
+    )
+    logger.info(f"Saved batch {batch_num} ({len(movies)} movies) to s3://{S3_BUCKET}/{key}")
+
+
+def get_movie_ids(date_str: str) -> list[int]:
+    """Download TMDB daily movie ID export and return list of valid IDs."""
+    dt = datetime.strptime(date_str, "%Y-%m-%d")
+    file_date = dt.strftime("%m_%d_%Y")
+    url = f"{EXPORT_BASE_URL}/movie_ids_{file_date}.json.gz"
+
+    logger.info(f"Downloading movie ID export from {url}")
+    headers = {"User-Agent": "Mozilla/5.0"}
+    response = requests.get(url, timeout=60, headers=headers)
+
+    if response.status_code == 404:
+        yesterday = (dt - timedelta(days=1)).strftime("%m_%d_%Y")
+        url = f"{EXPORT_BASE_URL}/movie_ids_{yesterday}.json.gz"
+        logger.info(f"Today's export not found, trying {url}")
+        response = requests.get(url, timeout=60, headers=headers)
+
+    response.raise_for_status()
+
+    ids = []
+    content = gzip.decompress(response.content).decode("utf-8")
+    for line in content.strip().split("\n"):
+        try:
+            record = json.loads(line)
+            if record.get("adult") is False and record.get("id"):
+                ids.append(record["id"])
+        except json.JSONDecodeError:
+            continue
+
+    logger.info(f"Found {len(ids)} movie IDs")
+    return ids
+
+
+def fetch_movie_detail(movie_id: int) -> dict | None:
+    """Fetch full detail record for a single movie."""
+    url = f"{TMDB_BASE_URL}/movie/{movie_id}"
+    params = {"api_key": TMDB_API_KEY, "language": "en-US"}
+    try:
+        response = requests.get(url, params=params, timeout=15)
+        if response.status_code == 404:
+            return None
+        response.raise_for_status()
+        return response.json()
+    except requests.RequestException:
+        return None
+
+
+def run_extract(source_date: str = None) -> None:
+    """Main entry point for the extract step with checkpointing."""
     if source_date is None:
         source_date = datetime.utcnow().strftime("%Y-%m-%d")
 
-    logger.info(f"Starting extraction for date: {source_date}")
-    products = extract_all_products()
+    logger.info(f"Starting TMDB movie extraction for date: {source_date}")
 
-    if not products:
-        raise ValueError("No products extracted — aborting upload")
+    checkpoint = load_checkpoint()
+    completed_batches = checkpoint["completed_batches"]
+    total_fetched = checkpoint["movies_fetched"]
+    skip_count = completed_batches * BATCH_SIZE
 
-    s3_path = upload_to_s3(products, source_date)
-    logger.info(f"Extract complete. {len(products)} products at {s3_path}")
-    return s3_path
+    ids = get_movie_ids(source_date)
+
+    # Skip already processed IDs
+    remaining_ids = ids[skip_count:]
+    logger.info(f"Skipping {skip_count} already processed IDs, {len(remaining_ids)} remaining")
+
+    current_batch = []
+    batch_num = completed_batches
+
+    for i, movie_id in enumerate(remaining_ids):
+        movie = fetch_movie_detail(movie_id)
+        if movie:
+            current_batch.append(movie)
+            total_fetched += 1
+
+        if len(current_batch) >= BATCH_SIZE:
+            batch_num += 1
+            save_batch_to_s3(current_batch, batch_num, source_date)
+            save_checkpoint(total_fetched, batch_num, source_date)
+            logger.info(f"Checkpoint saved: {total_fetched} total movies fetched")
+            current_batch = []
+
+        if (i + 1) % 1000 == 0:
+            logger.info(f"Progress: {i + 1}/{len(remaining_ids)} IDs processed, "
+                       f"{total_fetched} movies fetched")
+
+    # Save any remaining movies in the last partial batch
+    if current_batch:
+        batch_num += 1
+        save_batch_to_s3(current_batch, batch_num, source_date)
+        save_checkpoint(total_fetched, batch_num, source_date)
+
+    logger.info(f"Extract complete. {total_fetched} total movies saved in {batch_num} batches.")
 
 
 if __name__ == "__main__":
-    run_extract()
+    run_extract("2026-03-09")
