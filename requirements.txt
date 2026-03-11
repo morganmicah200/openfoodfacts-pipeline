@@ -3,7 +3,7 @@ requests==2.32.3
 urllib3==2.2.3
 
 # ── Data Processing ────────────────────────────────────────────────────────
-pandas==2.2.3
+pandas==2.1.4
 pyarrow==17.0.0          # Parquet read/write for S3 processed layer
 
 # ── AWS ────────────────────────────────────────────────────────────────────
