@@ -20,5 +20,7 @@ models:
   tmdb_dbt:
     staging:
       +materialized: view
+      +schema: RAW
     marts:
       +materialized: table
+      +schema: ANALYTICS
