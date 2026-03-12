@@ -1,0 +1,13 @@
+tmdb_dbt:
+  target: dev
+  outputs:
+    dev:
+      type: snowflake
+      account: wmxybwc-sl89298
+      user: morganmicah200
+      password: JE6X5QDbiXGpVA8
+      role: ACCOUNTADMIN
+      database: TMDB
+      warehouse: COMPUTE_WH
+      schema: ANALYTICS
+      threads: 4
