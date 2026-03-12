@@ -19,8 +19,6 @@ clean-targets:
 models:
   tmdb_dbt:
     staging:
-      +schema: raw
       +materialized: view
     marts:
-      +schema: analytics
       +materialized: table

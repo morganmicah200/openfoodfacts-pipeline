@@ -16,9 +16,9 @@ build/
 .ruff_cache/
 
 # ── dbt ────────────────────────────────────────────────────────────────────
-off_dbt/target/
-off_dbt/dbt_packages/
-off_dbt/logs/
+tmdb_dbt/target/
+tmdb_dbt/dbt_packages/
+tmdb_dbt/logs/
 
 # ── Data files (never commit raw data) ────────────────────────────────────
 data/
@@ -33,3 +33,6 @@ Thumbs.db
 # ── VSCode ─────────────────────────────────────────────────────────────────
 .vscode/
 *.code-workspace
+
+# ── YML ─────────────────────────────────────────────────────────────────
+tmdb_dbt/profiles.yml

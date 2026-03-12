@@ -1,0 +1,11 @@
+[0m19:08:51.308071 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'start', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000002A32E4D8950>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000002A32DCEE1E0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000002A32E05A8D0>]}
+
+
+============================== 19:08:51.315413 | f49244c1-afe9-4f14-83e4-d18018dc241e ==============================
+[0m19:08:51.315413 [info ] [MainThread]: Running with dbt=1.11.7
+[0m19:08:51.315413 [debug] [MainThread]: running dbt with arguments {'version_check': 'True', 'no_print': 'None', 'static_parser': 'True', 'warn_error_options': 'WarnErrorOptionsV2(error=[], warn=[], silence=[])', 'target_path': 'None', 'printer_width': '80', 'write_json': 'True', 'empty': 'None', 'log_cache_events': 'False', 'introspect': 'True', 'cache_selected_only': 'False', 'log_format': 'default', 'debug': 'False', 'fail_fast': 'False', 'profiles_dir': 'C:\\Users\\morga\\.dbt', 'send_anonymous_usage_stats': 'True', 'quiet': 'False', 'warn_error': 'None', 'partial_parse': 'True', 'indirect_selection': 'eager', 'invocation_command': 'dbt init tmdb_dbt', 'use_colors': 'True', 'use_experimental_parser': 'False', 'log_path': 'logs'}
+[0m19:08:51.341010 [info ] [MainThread]: A project called tmdb_dbt already exists here.
+[0m19:08:51.342169 [debug] [MainThread]: Command `dbt init` succeeded at 19:08:51.342169 after 0.22 seconds
+[0m19:08:51.342169 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'end', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000002A32DF11460>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000002A32D96A7E0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000002A32DFC2630>]}
+[0m19:08:51.342169 [debug] [MainThread]: Flushing usage events
+[0m19:08:51.889011 [debug] [MainThread]: An error was encountered while trying to flush usage events

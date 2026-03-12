@@ -67,7 +67,7 @@ def create_stg_movies_table(cursor):
             title           VARCHAR,
             original_title  VARCHAR,
             original_language VARCHAR,
-            release_date    DATE,
+            release_date    VARCHAR,
             status          VARCHAR,
             budget          INTEGER,
             revenue         INTEGER,
@@ -110,7 +110,7 @@ def load_parquet_to_snowflake(cursor, stage_name: str, source_date: str):
                 $1:title::VARCHAR,
                 $1:original_title::VARCHAR,
                 $1:original_language::VARCHAR,
-                $1:release_date::DATE,
+                $1:release_date::VARCHAR,
                 $1:status::VARCHAR,
                 $1:budget::INTEGER,
                 $1:revenue::INTEGER,
@@ -162,6 +162,8 @@ def run_load(source_date: str = None) -> None:
         stage_name = "tmdb_s3_stage"
         create_stage(cursor, stage_name)
         create_stg_movies_table(cursor)
+        cursor.execute("SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'STG_MOVIES'")
+        logger.info(f"Table exists check: {cursor.fetchone()}")
         cursor.execute("TRUNCATE TABLE stg_movies")
         load_parquet_to_snowflake(cursor, stage_name, source_date)
         conn.commit()
