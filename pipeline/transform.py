@@ -168,7 +168,7 @@ def run_transform(source_date: str = None) -> None:
     df["vote_average"] = pd.to_numeric(df["vote_average"], errors="coerce")
     df["vote_count"] = pd.to_numeric(df["vote_count"], errors="coerce").astype("Int64")
     df["popularity"] = pd.to_numeric(df["popularity"], errors="coerce")
-    df["release_date"] = pd.to_datetime(df["release_date"], errors="coerce")
+    df["release_date"] = df["release_date"].astype(str).replace("None", None)
 
     logger.info(f"DataFrame built. Shape: {df.shape}")
     logger.info(f"Columns: {list(df.columns)}")
