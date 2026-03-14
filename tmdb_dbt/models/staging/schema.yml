@@ -1,0 +1,17 @@
+version: 2
+
+models:
+  - name: movies_staging
+    description: "Staging view of raw TMDB movie data loaded from S3 via Parquet"
+    columns:
+      - name: movie_id
+        description: "Unique TMDB movie identifier"
+        tests:
+          - not_null
+          - unique
+      - name: title
+        description: "Movie title"
+        tests:
+          - not_null
+      - name: release_date
+        description: "Movie release date"
