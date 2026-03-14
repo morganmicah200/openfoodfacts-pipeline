@@ -32,7 +32,7 @@ select
     m.tagline,
     m.homepage,
 
-    -- Dimension foreign keys
+    -- Dimension foreign keys set
     g.genre_key,
     l.language_key,
     d.date_key,
