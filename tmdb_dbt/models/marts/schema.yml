@@ -1,0 +1,46 @@
+version: 2
+
+models:
+  - name: fact_movies
+    description: "Fact table containing all movie metrics"
+    columns:
+      - name: movie_id
+        description: "Unique TMDB movie identifier"
+        tests:
+          - not_null
+          - unique
+
+  - name: dim_genre
+    description: "Genre dimension table"
+    columns:
+      - name: genre_key
+        tests:
+          - not_null
+          - unique
+      - name: genre_name
+        tests:
+          - not_null
+
+  - name: dim_language
+    description: "Language dimension table"
+    columns:
+      - name: language_key
+        tests:
+          - not_null
+          - unique
+
+  - name: dim_release_date
+    description: "Date dimension table with year, month, quarter, day"
+    columns:
+      - name: date_key
+        tests:
+          - not_null
+          - unique
+
+  - name: dim_production_company
+    description: "Production company dimension table"
+    columns:
+      - name: company_key
+        tests:
+          - not_null
+          - unique
