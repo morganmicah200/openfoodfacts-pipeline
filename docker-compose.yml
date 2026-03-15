@@ -2,7 +2,7 @@ version: '3.8'
 
 x-airflow-common:
   &airflow-common
-  image: apache/airflow:2.10.2
+  build: .
   environment:
     &airflow-common-env
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
@@ -30,6 +30,7 @@ x-airflow-common:
     - ./logs:/opt/airflow/logs
     - ./config.py:/opt/airflow/config.py
     - ./.env:/opt/airflow/.env
+     - ./tmdb_dbt:/opt/airflow/tmdb_dbt
   depends_on:
     &airflow-common-depends-on
     postgres:

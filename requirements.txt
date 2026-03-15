@@ -1,23 +1,27 @@
 # ── API & HTTP ─────────────────────────────────────────────────────────────
-requests==2.32.3
+requests==2.32.5
 urllib3==2.2.3
+aiohttp==3.13.3
 
 # ── Data Processing ────────────────────────────────────────────────────────
 pandas==2.1.4
-pyarrow==17.0.0          # Parquet read/write for S3 processed layer
+pyarrow==17.0.0
 
 # ── AWS ────────────────────────────────────────────────────────────────────
 boto3==1.35.36
-s3fs==2024.9.0           # Pandas S3 read/write support
+s3fs==2024.9.0
 
 # ── Snowflake ──────────────────────────────────────────────────────────────
-snowflake-connector-python==3.12.3
+snowflake-connector-python==4.3.0
 snowflake-sqlalchemy==1.6.1
 
-# ── Airflow ────────────────────────────────────────────────────────────────
+# ── Airflow Providers ──────────────────────────────────────────────────────
 apache-airflow==2.10.2
 apache-airflow-providers-snowflake==5.7.1
 apache-airflow-providers-amazon==8.28.0
+
+# ── dbt ────────────────────────────────────────────────────────────────────
+dbt-snowflake==1.11.3
 
 # ── Environment & Config ───────────────────────────────────────────────────
 python-dotenv==1.0.1
@@ -26,13 +30,5 @@ python-dotenv==1.0.1
 pytest==8.3.3
 pytest-mock==3.14.0
 
-# ── Linting (optional but professional) ───────────────────────────────────
+# ── Linting ────────────────────────────────────────────────────────────────
 ruff==0.6.9
-
-# ── API & HTTP ─────────────────────────────────────────────────────────────
-requests==2.32.3
-urllib3==2.2.3
-aiohttp==3.13.3
-
-# ── dbt ────────────────────────────────────────────────────────────────────
-dbt-snowflake==1.9.0
