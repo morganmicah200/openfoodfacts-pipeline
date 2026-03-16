@@ -30,7 +30,7 @@ x-airflow-common:
     - ./logs:/opt/airflow/logs
     - ./config.py:/opt/airflow/config.py
     - ./.env:/opt/airflow/.env
-     - ./tmdb_dbt:/opt/airflow/tmdb_dbt
+    - ./tmdb_dbt:/opt/airflow/tmdb_dbt
   depends_on:
     &airflow-common-depends-on
     postgres:

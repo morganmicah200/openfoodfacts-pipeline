@@ -1,70 +1,54 @@
-"""
-dags/off_pipeline.py
-Airflow DAG for the Open Food Facts analytics pipeline.
-Schedule: daily at 06:00 UTC
-"""
-
 from datetime import datetime, timedelta
-from airflow.decorators import dag
+
+from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.operators.bash import BashOperator
 
+from pipeline.extract import run_extract
+from pipeline.validate import run_validate
+from pipeline.transform import run_transform
+from pipeline.load import run_load
+
 default_args = {
     "owner": "micah",
-    "retries": 2,
+    "retries": 1,
     "retry_delay": timedelta(minutes=5),
     "email_on_failure": False,
 }
 
-@dag(
-    dag_id="off_pipeline",
+with DAG(
+    dag_id="tmdb_pipeline",
     default_args=default_args,
-    schedule="0 6 * * *",
-    start_date=datetime(2024, 1, 1),
+    description="Daily TMDB movie pipeline: extract → validate → transform → load → dbt",
+    schedule_interval="0 6 * * *",
+    start_date=datetime(2026, 3, 9),
     catchup=False,
-    tags=["openfoodfacts", "s3", "snowflake"],
-    description="Ingest Open Food Facts API → S3 → Snowflake → dbt",
-)
-def off_pipeline():
+    tags=["tmdb", "movies"],
+) as dag:
 
-    # ── Extract ────────────────────────────────────────────────────────────
     extract = PythonOperator(
-        task_id="extract_products",
-        python_callable=lambda: None,   # TODO: replace with extract()
+        task_id="extract",
+        python_callable=run_extract,
     )
 
-    # ── Validate ───────────────────────────────────────────────────────────
     validate = PythonOperator(
-        task_id="validate_products",
-        python_callable=lambda: None,   # TODO: replace with validate()
+        task_id="validate",
+        python_callable=run_validate,
     )
 
-    # ── Transform ──────────────────────────────────────────────────────────
     transform = PythonOperator(
-        task_id="transform_products",
-        python_callable=lambda: None,   # TODO: replace with transform()
+        task_id="transform",
+        python_callable=run_transform,
     )
 
-    # ── Load ───────────────────────────────────────────────────────────────
     load = PythonOperator(
-        task_id="load_to_snowflake",
-        python_callable=lambda: None,   # TODO: replace with load()
+        task_id="load",
+        python_callable=run_load,
     )
 
-    # ── dbt run ────────────────────────────────────────────────────────────
     dbt_run = BashOperator(
         task_id="dbt_run",
-        bash_command="cd /opt/airflow/off_dbt && dbt run --profiles-dir .",
+        bash_command="docker exec tmdb-pipeline-dbt-1 dbt run --profiles-dir /opt/dbt",
     )
 
-    # ── dbt test ───────────────────────────────────────────────────────────
-    dbt_test = BashOperator(
-        task_id="dbt_test",
-        bash_command="cd /opt/airflow/off_dbt && dbt test --profiles-dir .",
-    )
-
-    # ── Task Dependencies ──────────────────────────────────────────────────
-    extract >> validate >> transform >> load >> dbt_run >> dbt_test
-
-
-off_pipeline()
+    extract >> validate >> transform >> load >> dbt_run

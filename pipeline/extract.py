@@ -217,6 +217,84 @@ async def run_extract(source_date: str = None) -> None:
 
     logger.info(f"Extract complete. {total_fetched} total movies saved in {batch_num} batches.")
 
+async def run_incremental_extract(source_date: str = None) -> None:
+    """
+    Incremental extract using the TMDB changes endpoint.
+    Fetches only movies added or modified since the previous day.
+    Used for daily Airflow runs after the initial backfill.
+    """
+    if source_date is None:
+        source_date = datetime.utcnow().strftime("%Y-%m-%d")
 
+    # Get movies that changed in the 24 hours up to source_date
+    end_date = source_date
+    start_date = (datetime.strptime(source_date, "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d")
+
+    logger.info(f"Starting incremental extract for changes from {start_date} to {end_date}")
+
+    url = f"{TMDB_BASE_URL}/movie/changes"
+    params = {
+        "api_key": TMDB_API_KEY,
+        "start_date": start_date,
+        "end_date": end_date,
+        "page": 1,
+    }
+
+    # Page through the changes endpoint to collect all changed movie IDs
+    movie_ids = []
+    while True:
+        response = requests.get(url, params=params, timeout=30)
+        response.raise_for_status()
+        data = response.json()
+
+        results = data.get("results", [])
+        movie_ids.extend([r["id"] for r in results if not r.get("adult", False)])
+
+        total_pages = data.get("total_pages", 1)
+        logger.info(f"Changes page {params['page']}/{total_pages} — {len(results)} movies")
+
+        if params["page"] >= total_pages:
+            break
+        params["page"] += 1
+
+    logger.info(f"Found {len(movie_ids)} changed/new movies to fetch")
+
+    if not movie_ids:
+        logger.info("No changes found for this date range. Skipping.")
+        return
+
+    # Fetch full details for each changed movie (reuse existing async logic)
+    semaphore = asyncio.Semaphore(CONCURRENCY)
+    current_batch = []
+    batch_num = 0
+
+    async with aiohttp.ClientSession() as session:
+        for chunk_start in range(0, len(movie_ids), CONCURRENCY):
+            chunk = movie_ids[chunk_start: chunk_start + CONCURRENCY]
+            tasks = [fetch_movie_detail(session, semaphore, mid) for mid in chunk]
+            results = await asyncio.gather(*tasks)
+
+            for movie in results:
+                if movie:
+                    current_batch.append(movie)
+
+            if len(current_batch) >= BATCH_SIZE:
+                batch_num += 1
+                save_batch_to_s3(current_batch, batch_num, source_date)
+                current_batch = []
+
+    if current_batch:
+        batch_num += 1
+        save_batch_to_s3(current_batch, batch_num, source_date)
+
+    logger.info(f"Incremental extract complete. {sum} movies saved in {batch_num} batches.")
+    logger.info(f"Incremental extract complete. Saved {batch_num} batches to S3 for {source_date}.")
+
+
+def run_incremental_extract_sync(source_date: str = None) -> None:
+    """Sync wrapper for Airflow PythonOperator."""
+    asyncio.run(run_incremental_extract(source_date))
+    
 if __name__ == "__main__":
     asyncio.run(run_extract("2026-03-09"))
+
