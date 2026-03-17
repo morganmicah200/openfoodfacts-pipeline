@@ -104,10 +104,9 @@ The `tmdb_pipeline` DAG runs daily at 06:00 UTC. On each run:
 - **Load** — appends new rows to Snowflake via COPY INTO
 - **dbt run** — rebuilds star schema including new records
 
-<!-- Add your screenshots here -->
-![DAG Graph](images/dag_graph.png)
-![Task Duration](images/task_duration.png)
-![Gantt](images/gantt.png)
+![DAG Graph](images/Airflow_graph.png)
+![Task Duration](images/Airflow_Chart.png)
+![Airflow Bars](images/Airflow_bars.png)
 
 ---
 
