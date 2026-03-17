@@ -19,6 +19,7 @@ build/
 tmdb_dbt/target/
 tmdb_dbt/dbt_packages/
 tmdb_dbt/logs/
+logs/
 
 # ── Data files (never commit raw data) ────────────────────────────────────
 data/

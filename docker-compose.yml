@@ -1,5 +1,3 @@
-version: '3.8'
-
 x-airflow-common:
   &airflow-common
   build: .
@@ -11,10 +9,10 @@ x-airflow-common:
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
     AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth'
-    # Pipeline env vars
+    PYTHONPATH: /opt/airflow
     AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
     AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
-    AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION}
+    AWS_REGION: ${AWS_REGION}
     S3_BUCKET: ${S3_BUCKET}
     SF_ACCOUNT: ${SF_ACCOUNT}
     SF_USER: ${SF_USER}
@@ -31,8 +29,8 @@ x-airflow-common:
     - ./config.py:/opt/airflow/config.py
     - ./.env:/opt/airflow/.env
     - ./tmdb_dbt:/opt/airflow/tmdb_dbt
+    - /var/run/docker.sock:/var/run/docker.sock
   depends_on:
-    &airflow-common-depends-on
     postgres:
       condition: service_healthy
 
@@ -63,18 +61,16 @@ services:
       retries: 5
     restart: always
     depends_on:
-      <<: *airflow-common-depends-on
-      airflow-init:
-        condition: service_completed_successfully
+      - postgres
+      - airflow-init
 
   airflow-scheduler:
     <<: *airflow-common
     command: scheduler
     restart: always
     depends_on:
-      <<: *airflow-common-depends-on
-      airflow-init:
-        condition: service_completed_successfully
+      - postgres
+      - airflow-init
 
   airflow-init:
     <<: *airflow-common
@@ -93,8 +89,17 @@ services:
     environment:
       <<: *airflow-common-env
     depends_on:
-      postgres:
-        condition: service_healthy
+      - postgres
+
+  dbt:
+    build:
+      context: .
+      dockerfile: Dockerfile.dbt
+    container_name: tmdb-pipeline-dbt-1
+    volumes:
+      - ./tmdb_dbt:/opt/dbt
+      - ./.env:/opt/dbt/.env
+    entrypoint: ["tail", "-f", "/dev/null"]
 
 volumes:
   postgres-db-volume:

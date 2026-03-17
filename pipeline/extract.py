@@ -4,12 +4,6 @@ import json
 import logging
 from datetime import datetime, timedelta
 
-import asyncio
-import gzip
-import json
-import logging
-from datetime import datetime, timedelta
-
 import aiohttp
 import requests
 import boto3
@@ -154,7 +148,11 @@ async def fetch_movie_detail(session: aiohttp.ClientSession, semaphore: asyncio.
         except Exception:
             return None
 
-
+# ─────────────────────────────────────────────────────────────────
+# HISTORICAL BACKFILL
+# Run once to load the full TMDB movie catalog from the ID export.
+# Used for initial load on 2026-03-09 (1,047,481 movies).
+# ─────────────────────────────────────────────────────────────────
 async def run_extract(source_date: str = None) -> None:
     """
     Main extract function. Orchestrates the full pipeline:
@@ -217,6 +215,11 @@ async def run_extract(source_date: str = None) -> None:
 
     logger.info(f"Extract complete. {total_fetched} total movies saved in {batch_num} batches.")
 
+# ─────────────────────────────────────────────────────────────────
+# INCREMENTAL EXTRACT (DAILY)
+# Uses the TMDB changes endpoint to fetch only new/updated movies.
+# Called by Airflow on schedule — typically a few hundred movies/day.
+# ─────────────────────────────────────────────────────────────────
 async def run_incremental_extract(source_date: str = None) -> None:
     """
     Incremental extract using the TMDB changes endpoint.
@@ -286,15 +289,14 @@ async def run_incremental_extract(source_date: str = None) -> None:
     if current_batch:
         batch_num += 1
         save_batch_to_s3(current_batch, batch_num, source_date)
-
-    logger.info(f"Incremental extract complete. {sum} movies saved in {batch_num} batches.")
+        
     logger.info(f"Incremental extract complete. Saved {batch_num} batches to S3 for {source_date}.")
 
 
 def run_incremental_extract_sync(source_date: str = None) -> None:
     """Sync wrapper for Airflow PythonOperator."""
     asyncio.run(run_incremental_extract(source_date))
-    
+
 if __name__ == "__main__":
     asyncio.run(run_extract("2026-03-09"))
 
