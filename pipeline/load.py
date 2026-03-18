@@ -164,7 +164,6 @@ def run_load(source_date: str = None) -> None:
         create_stg_movies_table(cursor)
         cursor.execute("SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'STG_MOVIES'")
         logger.info(f"Table exists check: {cursor.fetchone()}")
-        cursor.execute("TRUNCATE TABLE stg_movies")
         load_parquet_to_snowflake(cursor, stage_name, source_date)
         conn.commit()
         logger.info("Load complete.")
