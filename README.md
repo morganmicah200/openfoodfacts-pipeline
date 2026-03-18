@@ -44,7 +44,7 @@ TMDB API → extract.py → S3 raw/movies/YYYY-MM-DD/batch_XXXX.json
 
 ---
 
-## Pipeline Stages
+## Stages of Pipeline
 
 ### Extract
 Downloads the full TMDB movie catalog using the daily ID export file, then fetches full movie details concurrently using `aiohttp` with 50 simultaneous requests and an `asyncio` semaphore for rate limiting. Checkpointed to S3 after every batch so extraction can resume if interrupted.
