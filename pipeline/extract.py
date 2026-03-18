@@ -24,6 +24,7 @@ CHECKPOINT_KEY = "checkpoints/movies_checkpoint.json"
 BATCH_SIZE = 10000      # number of movies per S3 batch file
 CONCURRENCY = 50        # number of simultaneous TMDB API requests
 
+
 def load_checkpoint() -> dict:
     """
     Load the checkpoint file from S3 if it exists.
@@ -134,11 +135,13 @@ async def fetch_movie_detail(session: aiohttp.ClientSession, semaphore: asyncio.
         except Exception:
             return None
 
+
 # ─────────────────────────────────────────────────────────────────
 # HISTORICAL BACKFILL
 # Run once to load the full TMDB movie catalog from the ID export.
 # Used for initial load on 2026-03-09 (1,047,481 movies).
 # ─────────────────────────────────────────────────────────────────
+
 async def run_extract(source_date: str = None) -> None:
     """
     Main extract function. Orchestrates the full pipeline:
@@ -152,7 +155,6 @@ async def run_extract(source_date: str = None) -> None:
 
     logger.info(f"Starting TMDB movie extraction for date: {source_date}")
 
-    # Resume from last completed batch if checkpoint exists
     checkpoint = load_checkpoint()
     completed_batches = checkpoint["completed_batches"]
     total_fetched = checkpoint["movies_fetched"]
@@ -167,10 +169,8 @@ async def run_extract(source_date: str = None) -> None:
     semaphore = asyncio.Semaphore(CONCURRENCY)
 
     async with aiohttp.ClientSession() as session:
-        # Process IDs in chunks of CONCURRENCY, firing requests simultaneously
         for chunk_start in range(0, len(remaining_ids), CONCURRENCY):
             chunk = remaining_ids[chunk_start: chunk_start + CONCURRENCY]
-
             tasks = [fetch_movie_detail(session, semaphore, mid) for mid in chunk]
             results = await asyncio.gather(*tasks)
 
@@ -179,7 +179,6 @@ async def run_extract(source_date: str = None) -> None:
                     current_batch.append(movie)
                     total_fetched += 1
 
-            # When batch is full, save to S3 and checkpoint progress
             if len(current_batch) >= BATCH_SIZE:
                 batch_num += 1
                 save_batch_to_s3(current_batch, batch_num, source_date)
@@ -193,7 +192,6 @@ async def run_extract(source_date: str = None) -> None:
                     f"{total_fetched} movies fetched"
                 )
 
-    # Save any remaining movies that didn't fill a complete batch
     if current_batch:
         batch_num += 1
         save_batch_to_s3(current_batch, batch_num, source_date)
@@ -201,25 +199,23 @@ async def run_extract(source_date: str = None) -> None:
 
     logger.info(f"Extract complete. {total_fetched} total movies saved in {batch_num} batches.")
 
+
 # ─────────────────────────────────────────────────────────────────
 # INCREMENTAL EXTRACT (DAILY)
 # Uses the TMDB changes endpoint to fetch only new/updated movies.
 # Called by Airflow on schedule — typically a few hundred movies/day.
 # ─────────────────────────────────────────────────────────────────
-async def run_incremental_extract(source_date: str = None) -> None:
-    """
-    Incremental extract using the TMDB changes endpoint.
-    Fetches only movies added or modified since the previous day.
-    Used for daily Airflow runs after the initial backfill.
-    """
-    if source_date is None:
-        source_date = datetime.utcnow().strftime("%Y-%m-%d")
 
-    # Get movies that changed in the 24 hours up to source_date
+def get_changed_movie_ids(source_date: str) -> list[int]:
+    """
+    Fetch all changed/new movie IDs from the TMDB changes endpoint.
+    Paginates synchronously before the async event loop starts to
+    avoid blocking the event loop with synchronous HTTP calls.
+    """
     end_date = source_date
     start_date = (datetime.strptime(source_date, "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d")
 
-    logger.info(f"Starting incremental extract for changes from {start_date} to {end_date}")
+    logger.info(f"Fetching changed movie IDs from {start_date} to {end_date}")
 
     url = f"{TMDB_BASE_URL}/movie/changes"
     params = {
@@ -229,7 +225,6 @@ async def run_incremental_extract(source_date: str = None) -> None:
         "page": 1,
     }
 
-    # Page through the changes endpoint to collect all changed movie IDs
     movie_ids = []
     while True:
         response = requests.get(url, params=params, timeout=30)
@@ -247,12 +242,24 @@ async def run_incremental_extract(source_date: str = None) -> None:
         params["page"] += 1
 
     logger.info(f"Found {len(movie_ids)} changed/new movies to fetch")
+    return movie_ids
+
+
+async def run_incremental_extract(source_date: str = None) -> None:
+    """
+    Incremental extract using the TMDB changes endpoint.
+    Fetches only movies added or modified since the previous day.
+    Used for daily Airflow runs after the initial backfill.
+    """
+    if source_date is None:
+        source_date = datetime.utcnow().strftime("%Y-%m-%d")
+
+    movie_ids = get_changed_movie_ids(source_date)
 
     if not movie_ids:
         logger.info("No changes found for this date range. Skipping.")
         return
 
-    # Fetch full details for each changed movie (reuse existing async logic)
     semaphore = asyncio.Semaphore(CONCURRENCY)
     current_batch = []
     batch_num = 0
@@ -275,7 +282,7 @@ async def run_incremental_extract(source_date: str = None) -> None:
     if current_batch:
         batch_num += 1
         save_batch_to_s3(current_batch, batch_num, source_date)
-        
+
     logger.info(f"Incremental extract complete. Saved {batch_num} batches to S3 for {source_date}.")
 
 
@@ -283,6 +290,6 @@ def run_incremental_extract_sync(source_date: str = None) -> None:
     """Sync wrapper for Airflow PythonOperator."""
     asyncio.run(run_incremental_extract(source_date))
 
+
 if __name__ == "__main__":
     asyncio.run(run_extract("2026-03-09"))
-
