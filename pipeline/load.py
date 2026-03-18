@@ -93,8 +93,7 @@ def create_stg_movies_table(cursor):
 def load_parquet_to_snowflake(cursor, stage_name: str, source_date: str):
     """
     Use Snowflake's COPY INTO to bulk load the Parquet file from S3
-    into stg_movies. This is the fastest way to load data into Snowflake
-    and is optimized for Parquet format natively.
+    into stg_movies. Inspects results and raises if any rows failed to load.
     """
     prefix = s3_processed_prefix("movies", source_date)
     parquet_path = f"@{stage_name}/{prefix}movies.parquet"
@@ -138,6 +137,16 @@ def load_parquet_to_snowflake(cursor, stage_name: str, source_date: str):
     results = cursor.fetchall()
     for row in results:
         logger.info(f"COPY INTO result: {row}")
+        rows_loaded = row[2]
+        rows_parsed = row[3]
+        errors_seen = row[5]
+        if errors_seen > 0:
+            raise ValueError(
+                f"COPY INTO completed with {errors_seen} errors. "
+                f"Rows parsed: {rows_parsed}, rows loaded: {rows_loaded}."
+            )
+
+    logger.info(f"Load complete. {sum(row[2] for row in results)} rows loaded.")
 
 
 def run_load(source_date: str = None) -> None:
@@ -165,7 +174,6 @@ def run_load(source_date: str = None) -> None:
         cursor.execute("SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'STG_MOVIES'")
         logger.info(f"Table exists check: {cursor.fetchone()}")
         load_parquet_to_snowflake(cursor, stage_name, source_date)
-        conn.commit()
         logger.info("Load complete.")
     except Exception as e:
         logger.error(f"Load failed: {e}")

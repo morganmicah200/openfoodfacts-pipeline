@@ -6,18 +6,15 @@ from datetime import datetime, timedelta
 
 import aiohttp
 import requests
-import boto3
 from botocore.exceptions import ClientError
 
 from config import (
     TMDB_BASE_URL,
     TMDB_API_KEY,
-    AWS_ACCESS_KEY_ID,
-    AWS_SECRET_ACCESS_KEY,
-    AWS_DEFAULT_REGION,
     S3_BUCKET,
     s3_raw_prefix,
 )
+from pipeline.utils import get_s3_client
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -26,17 +23,6 @@ EXPORT_BASE_URL = "https://files.tmdb.org/p/exports"
 CHECKPOINT_KEY = "checkpoints/movies_checkpoint.json"
 BATCH_SIZE = 10000      # number of movies per S3 batch file
 CONCURRENCY = 50        # number of simultaneous TMDB API requests
-
-
-def get_s3_client():
-    """Create and return a boto3 S3 client using credentials from config."""
-    return boto3.client(
-        "s3",
-        aws_access_key_id=AWS_ACCESS_KEY_ID,
-        aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
-        region_name=AWS_DEFAULT_REGION,
-    )
-
 
 def load_checkpoint() -> dict:
     """

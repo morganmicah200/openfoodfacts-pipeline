@@ -30,9 +30,6 @@ TMDB_BASE_URL  = "https://api.themoviedb.org/3"
 TMDB_API_KEY   = os.getenv("TMDB_API_KEY")
 TMDB_PAGE_SIZE = 20  # TMDB returns 20 results per page (fixed by API)
 
-# Entity types to ingest
-TMDB_ENTITIES = ["movies", "tv_shows", "people"]
-
 # ── S3 Path Helpers ────────────────────────────────────────────────────────
 def s3_raw_prefix(entity: str, date_str: str) -> str:
     """e.g. raw/movies/2024-11-01/"""

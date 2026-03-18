@@ -1,18 +1,13 @@
-import json
 import logging
 from datetime import datetime
-
-import boto3
-from botocore.exceptions import ClientError
+import json
 
 from config import (
-    AWS_ACCESS_KEY_ID,
-    AWS_SECRET_ACCESS_KEY,
-    AWS_DEFAULT_REGION,
     S3_BUCKET,
     s3_raw_prefix,
     s3_staged_prefix,
 )
+from pipeline.utils import get_s3_client, load_batch_from_s3
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -22,16 +17,6 @@ REQUIRED_FIELDS = ["id", "title", "release_date"]
 
 # Numeric fields that must be a number if present
 NUMERIC_FIELDS = ["budget", "revenue", "runtime", "vote_average", "vote_count", "popularity"]
-
-
-def get_s3_client():
-    """Create and return a boto3 S3 client using credentials from config."""
-    return boto3.client(
-        "s3",
-        aws_access_key_id=AWS_ACCESS_KEY_ID,
-        aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
-        region_name=AWS_DEFAULT_REGION,
-    )
 
 
 def list_raw_batches(source_date: str) -> list[str]:
@@ -46,12 +31,6 @@ def list_raw_batches(source_date: str) -> list[str]:
     logger.info(f"Found {len(keys)} raw batch files to validate")
     return sorted(keys)
 
-
-def load_batch_from_s3(key: str) -> list[dict]:
-    """Load and parse a JSON batch file from S3."""
-    s3 = get_s3_client()
-    response = s3.get_object(Bucket=S3_BUCKET, Key=key)
-    return json.loads(response["Body"].read().decode("utf-8"))
 
 
 def save_staged_batch(movies: list[dict], batch_num: int, source_date: str):

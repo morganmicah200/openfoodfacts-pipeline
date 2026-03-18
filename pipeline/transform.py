@@ -1,34 +1,20 @@
-import json
 import logging
 from datetime import datetime
 
-import boto3
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 from io import BytesIO
 
 from config import (
-    AWS_ACCESS_KEY_ID,
-    AWS_SECRET_ACCESS_KEY,
-    AWS_DEFAULT_REGION,
     S3_BUCKET,
     s3_staged_prefix,
     s3_processed_prefix,
 )
+from pipeline.utils import get_s3_client, load_batch_from_s3
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-
-def get_s3_client():
-    """Create and return a boto3 S3 client using credentials from config."""
-    return boto3.client(
-        "s3",
-        aws_access_key_id=AWS_ACCESS_KEY_ID,
-        aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
-        region_name=AWS_DEFAULT_REGION,
-    )
 
 
 def list_staged_batches(source_date: str) -> list[str]:
@@ -40,12 +26,6 @@ def list_staged_batches(source_date: str) -> list[str]:
     logger.info(f"Found {len(keys)} staged batch files to transform")
     return sorted(keys)
 
-
-def load_batch_from_s3(key: str) -> list[dict]:
-    """Load and parse a JSON batch file from S3."""
-    s3 = get_s3_client()
-    response = s3.get_object(Bucket=S3_BUCKET, Key=key)
-    return json.loads(response["Body"].read().decode("utf-8"))
 
 
 def save_parquet_to_s3(df: pd.DataFrame, source_date: str):
@@ -82,22 +62,22 @@ def flatten_movie(movie: dict) -> dict:
     """
     # Extract genre names as pipe-delimited string e.g. "Action|Drama"
     genres = movie.get("genres") or []
-    genre_names = "|".join([g.get("name", "") for g in genres if g.get("name")])
-    genre_ids = "|".join([str(g.get("id", "")) for g in genres if g.get("id")])
+    genre_names = "|".join([genre.get("name", "") for genre in genres if genre.get("name")])
+    genre_ids = "|".join([str(genre.get("id", "")) for genre in genres if genre.get("id")])
 
     # Extract spoken language codes e.g. "en|fr|es"
     languages = movie.get("spoken_languages") or []
-    language_codes = "|".join([l.get("iso_639_1", "") for l in languages if l.get("iso_639_1")])
-    language_names = "|".join([l.get("name", "") for l in languages if l.get("name")])
+    language_codes = "|".join([lang.get("iso_639_1", "") for lang in languages if lang.get("iso_639_1")])
+    language_names = "|".join([lang.get("name", "") for lang in languages if lang.get("name")])
 
     # Extract production company names and IDs
     companies = movie.get("production_companies") or []
-    company_names = "|".join([c.get("name", "") for c in companies if c.get("name")])
-    company_ids = "|".join([str(c.get("id", "")) for c in companies if c.get("id")])
+    company_names = "|".join([company.get("name", "") for company in companies if company.get("name")])
+    company_ids = "|".join([str(company.get("id", "")) for company in companies if company.get("id")])
 
     # Extract production country codes e.g. "US|GB"
     countries = movie.get("production_countries") or []
-    country_codes = "|".join([c.get("iso_3166_1", "") for c in countries if c.get("iso_3166_1")])
+    country_codes = "|".join([country.get("iso_3166_1", "") for country in countries if country.get("iso_3166_1")])
 
     return {
         # Core identifiers

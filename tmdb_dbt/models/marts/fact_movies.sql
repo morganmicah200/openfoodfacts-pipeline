@@ -2,6 +2,11 @@
 -- Joins movies_staging to all dimension tables via surrogate keys
 -- Contains all measurable metrics for analysis
 
+-- NOTE: Movies may have multiple genres, languages, and production companies.
+-- The pipe-delimited approach stores all values but FK joins use only the
+-- primary (first) value per dimension. A bridge table would be required
+-- to model full many-to-many relationships.
+
 with movies as (
     select * from {{ ref('movies_staging') }}
 ),
