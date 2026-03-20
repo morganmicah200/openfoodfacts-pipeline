@@ -30,7 +30,7 @@ WHERE f.profit IS NOT NULL
 GROUP BY g.genre_name
 ORDER BY avg_profit DESC;
 
--- ── 3. Average ROI by decade ──────────────────────────────────────
+-- ── 3. Average ROI from decade ──────────────────────────────────────
 SELECT
     FLOOR(d.year / 10) * 10 AS decade,
     COUNT(*) AS total_movies,
