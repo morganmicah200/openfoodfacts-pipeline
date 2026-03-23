@@ -166,8 +166,6 @@ Keeping dbt in a separate container avoids dependency conflicts with Airflow and
 
 **Docker BuildKit on Windows** — The default BuildKit engine on Windows Docker Desktop produces intermittent `RST_STREAM INTERNAL_ERROR` failures when pulling base images. Resolved by identifying that `Dockerfile.dbt` was saved in UTF-16 LE encoding rather than UTF-8, which caused the build context to be corrupted before it reached the daemon.
 
-**Snowflake credential interpolation** — Passwords containing `$` characters are misinterpreted as shell variable references when passed through Docker Compose environment variable substitution. Resolved by escaping `$` characters in the `.env` file, ensuring credentials are passed to containers without mangling.
-
 ---
 
 ## How to Run
