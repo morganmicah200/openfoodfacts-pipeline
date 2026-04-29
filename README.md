@@ -18,6 +18,7 @@
 
 End-to-end data engineering pipeline that ingests movie data from the TMDB API, stages it in AWS S3, loads it into Snowflake, and models it into a star schema using dbt. Orchestrated daily with Apache Airflow running in Docker. Initial backfill loaded **1,047,481 movies** — the pipeline now runs incrementally every 24 hours, appending new and updated movies using the TMDB changes endpoint.
 
+
 ---
 
 ## Architecture
