@@ -148,6 +148,7 @@ extract → validate → transform → load → dbt_run
 
 ## Docker
 
+
 The pipeline runs in two isolated containers:
 
 - **Airflow** — `apache/airflow:2.10.2` base image running the webserver and scheduler
